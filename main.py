@@ -1,3 +1,5 @@
+__version__ = "o1"
+
 from aufur_wizard.ui.dashboard import Dashboard
 
 
