@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aufur-wizard"
+version = "o1"
+description = "Secure file shredder"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = ["psutil>=5.9", "textual>=0.50"]
+
+[project.scripts]
+aufur = "aufur_wizard.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aufur_wizard"]
