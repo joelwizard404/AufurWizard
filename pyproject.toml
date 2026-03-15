@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aufur-wizard"
-version = "o1"
-description = "Secure file shredder"
+version = "o2"
+description = "AufurWizard is the perfect tool to effortlessly remove files from your personal computer."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
