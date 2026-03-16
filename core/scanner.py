@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,21 +42,20 @@ class FileEntry:
         return _human_size(self.size)
 
 
-_VIRTUAL_FS = {
-    "tmpfs", "devtmpfs", "squashfs", "overlay",
-    "proc", "sysfs", "cgroup", "devpts", "debugfs",
-}
+_VIRTUAL_FS = {"tmpfs", "devtmpfs", "squashfs", "overlay",
+               "proc", "sysfs", "cgroup", "devpts", "debugfs"}
+
+_MACOS_SYSTEM_MOUNTS = {"/", "/System/Volumes/Data"}
+
 
 def list_disks(include_virtual: bool = False) -> list[DiskInfo]:
     results: list[DiskInfo] = []
-    removable_set = _removable_devices()
-
     for part in psutil.disk_partitions(all=False):
         if not include_virtual and part.fstype in _VIRTUAL_FS:
             continue
         try:
             usage = psutil.disk_usage(part.mountpoint)
-        except (PermissionError, OSError):
+        except PermissionError:
             continue
         results.append(DiskInfo(
             device=part.device,
@@ -66,7 +64,7 @@ def list_disks(include_virtual: bool = False) -> list[DiskInfo]:
             total=usage.total,
             used=usage.used,
             free=usage.free,
-            is_removable=part.device in removable_set,
+            is_removable=_is_removable(part.device, part.mountpoint),
         ))
     return results
 
@@ -76,85 +74,25 @@ def scan_path(root: Path) -> list[FileEntry]:
     if root.is_file():
         return [_make_entry(root)]
     for dirpath, _, filenames in os.walk(root, topdown=True, onerror=lambda _: None):
-        entries.append(FileEntry(
-            path=Path(dirpath),
-            size=_dir_size(Path(dirpath)),
-            is_dir=True,
-        ))
+        entries.append(FileEntry(path=Path(dirpath), size=_dir_size(Path(dirpath)), is_dir=True))
         for fname in filenames:
             entries.append(_make_entry(Path(dirpath) / fname))
     return sorted(entries, key=lambda e: e.path)
 
-def _removable_devices() -> set[str]:
-    """Return a set of device paths that are considered removable."""
-    if sys.platform == "win32":
-        return _removable_windows()
+
+def _is_removable(device: str, mountpoint: str = "") -> bool:
+    if sys.platform == "linux":
+        name = Path(device).name.rstrip("0123456789")
+        try:
+            return Path(f"/sys/block/{name}/removable").read_text().strip() == "1"
+        except OSError:
+            return False
+
     if sys.platform == "darwin":
-        return _removable_macos()
-    return _removable_linux()
+        return mountpoint not in _MACOS_SYSTEM_MOUNTS
 
+    return False
 
-def _removable_linux() -> set[str]:
-    removable: set[str] = set()
-    try:
-        block = Path("/sys/block")
-        for dev_dir in block.iterdir():
-            removable_path = dev_dir / "removable"
-            try:
-                if removable_path.read_text().strip() == "1":
-                    removable.add(f"/dev/{dev_dir.name}")
-            except OSError:
-                pass
-    except OSError:
-        pass
-    return removable
-
-
-def _removable_macos() -> set[str]:
-    """Use diskutil to find external/removable disks on macOS."""
-    removable: set[str] = set()
-    try:
-        result = subprocess.run(
-            ["diskutil", "list", "-plist"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode != 0:
-            return removable
-        import plistlib
-        data = plistlib.loads(result.stdout.encode())
-        for disk in data.get("AllDisksAndPartitions", []):
-            disk_id = disk.get("DeviceIdentifier", "")
-            info_result = subprocess.run(
-                ["diskutil", "info", "-plist", disk_id],
-                capture_output=True, text=True, timeout=5,
-            )
-            if info_result.returncode == 0:
-                info = plistlib.loads(info_result.stdout.encode())
-                if info.get("RemovableMediaOrExternalDevice") or info.get("Removable"):
-                    removable.add(f"/dev/{disk_id}")
-    except Exception:
-        pass
-    return removable
-
-
-def _removable_windows() -> set[str]:
-    """Use wmic to detect removable drives on Windows."""
-    removable: set[str] = set()
-    try:
-        result = subprocess.run(
-            ["wmic", "logicaldisk", "get", "DeviceID,DriveType"],
-            capture_output=True, text=True, timeout=10,
-        )
-        for line in result.stdout.splitlines():
-            parts = line.split()
-            if len(parts) == 2:
-                device_id, drive_type = parts
-                # DriveType 2 = removable, 5 = CD-ROM
-                if drive_type in ("2", "5"):
-                    removable.add(device_id + "\\")
-    except Exception:
-        pass
-    return removable
 
 def _make_entry(path: Path) -> FileEntry:
     try:
