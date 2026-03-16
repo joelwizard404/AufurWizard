@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import re
-import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -66,10 +63,8 @@ class DiskPicker(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="card"):
-            yield Label(
-                "⚠  This will permanently destroy all data on the selected device.",
-                id="warning",
-            )
+            yield Label("⚠  This will permanently destroy all data on the selected device.",
+                        id="warning")
             yield Label("Device", classes="row")
             yield Select(self._disk_options(), id="disk_select")
             yield Label("Standard", classes="row")
@@ -83,19 +78,12 @@ class DiskPicker(Screen):
 
     def _disk_options(self) -> list[tuple[str, str]]:
         disks = list_disks()
-        options: list[tuple[str, str]] = []
-        
-        if sys.platform == "win32":
-            for pd_label, pd_path in _list_physical_drives_windows():
-                options.append((pd_label, pd_path))
-
-        for d in disks:
-            options.append((
-                f"{d.device}  [{d.fstype}]  {d.total_human}  {d.mountpoint}",
-                d.device,
-            ))
-
-        return options or [("No disks found", "")]
+        if not disks:
+            return [("No disks found", "")]
+        return [
+            (f"{d.device}  [{d.fstype}]  {d.total_human}  {d.mountpoint}", d.device)
+            for d in disks
+        ]
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_back":
@@ -120,9 +108,7 @@ class DiskPicker(Screen):
         from ..core.standards import get
         standard = get(str(standard_id))
 
-        self._set_status(
-            f"Wiping [bold]{device}[/bold] with [bold]{standard.name}[/bold]…"
-        )
+        self._set_status(f"Wiping [bold]{device}[/bold] with [bold]{standard.name}[/bold]…")
         self.query_one("#btn_wipe", Button).disabled = True
         self.query_one("#progress", ProgressBar).update(progress=0)
         self._bytes_written = 0
@@ -169,40 +155,3 @@ class DiskPicker(Screen):
 
     def _set_status(self, text: str) -> None:
         self.query_one("#status", Static).update(text)
-
-def _list_physical_drives_windows() -> list[tuple[str, str]]:
-    """Return (label, path) pairs for \\.\PhysicalDriveN on Windows."""
-    drives: list[tuple[str, str]] = []
-    try:
-        result = subprocess.run(
-            [
-                "wmic", "diskdrive",
-                "get", "DeviceID,Size,Model",
-                "/format:csv",
-            ],
-            capture_output=True, text=True, timeout=10,
-        )
-        for line in result.stdout.splitlines():
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) < 4 or not parts[1].startswith("\\\\.\\"):
-                continue
-            device_id = parts[1]
-            model     = parts[2]
-            size_raw  = parts[3]
-            try:
-                size_label = _human_size(int(size_raw))
-            except ValueError:
-                size_label = "? GB"
-            label = f"{device_id}  {model}  {size_label}  [physical]"
-            drives.append((label, device_id))
-    except Exception:
-        pass
-    return drives
-
-
-def _human_size(n: int) -> str:
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024:
-            return f"{n:.1f} {unit}"
-        n /= 1024  # type: ignore[assignment]
-    return f"{n:.1f} PB"
