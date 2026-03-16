@@ -1,68 +1,68 @@
 # AufurWizard
 
-A terminal-based secure file shredder with multiple wiping standards.
+A terminal-based secure file shredding tool for **Linux** and **macOS**.
 
----
+```
+┌──────────────────────────────────────────────┐
+│  AufurWizard                                 │
+│                                              │
+│  ❯ Shred files / folders                     │
+│    Shred disk / partition                    │
+│    View history                              │
+│    Quit                                      │
+└──────────────────────────────────────────────┘
+```
 
 ## Features
 
-- **Multiple wipe standards** – Zero Fill, Random, DoD 3-Pass, DoD 7-Pass, Gutmann 35-Pass
-- **Files & folders** – shred individual files or entire directory trees
-- **Disk wiping** – overwrite full block devices (requires root)
-- **Operation history** – every wipe is logged locally
-- **TUI interface** – keyboard-driven terminal UI via [Textual](https://textual.textualize.io/)
-
----
-
-## Requirements
-
-- Python 3.11+
-- Linux or macOS
-- Root/sudo for block device wiping
-
----
+- Multiple wipe standards: Zero Fill, Random, DoD 3-Pass, DoD 7-Pass, Gutmann 35-Pass
+- Shred individual files, entire folders, or raw block devices / partitions
+- Cryptographically random data via Python's `secrets` module
+- Verification pass after DoD standards
+- Operation history log at `~/.aufur_wizard/history.log`
+- Fully keyboard-navigable TUI
 
 ## Installation
+
 ```bash
 pip install aufur-wizard
 ```
 
 Or from source:
+
 ```bash
-git clone https://github.com/joelwizard404/AufurWizard.git
-cd AufurWizard
+git clone https://github.com/joelwizard404/AuferWizard.git
+cd AuferWizard
 pip install .
 ```
 
----
-
 ## Usage
+
 ```bash
 aufur
 ```
 
-Use arrow keys to navigate, Enter to select, Escape to go back.
+Wiping block devices requires root:
 
----
+```bash
+sudo aufur
+```
 
 ## Wipe Standards
 
-| ID        | Name                   | Passes | Notes                        |
-|-----------|------------------------|--------|------------------------------|
-| `zero`    | Zero Fill              | 1      | Fast, not forensically secure |
-| `random`  | Random                 | 1      | Single pass of random data   |
-| `dod3`    | DoD 5220.22-M          | 3      | US DoD standard              |
-| `dod7`    | DoD 5220.22-M ECE      | 7      | Extended DoD standard        |
-| `gutmann` | Gutmann                | 35     | Maximum security for HDDs    |
+| ID        | Name                     | Passes | Verify |
+|-----------|--------------------------|--------|--------|
+| `zero`    | Zero Fill                | 1      | No     |
+| `random`  | Random (1-Pass)          | 1      | No     |
+| `dod3`    | DoD 5220.22-M (3-Pass)   | 3      | Yes    |
+| `dod7`    | DoD 5220.22-M ECE (7-Pass)| 7     | Yes    |
+| `gutmann` | Gutmann (35-Pass)        | 35     | No     |
 
----
+## Requirements
 
-## Log location
-```
-~/.aufur_wizard/history.log
-```
+- Python 3.11+
+- Linux or macOS (Windows not supported)
 
----
 ## License
 
-Public domain – see [LICENSE](LICENSE).
+Public domain — see [LICENSE](LICENSE).
